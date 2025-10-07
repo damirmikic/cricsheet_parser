@@ -46,7 +46,7 @@
         <!-- Header -->
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white">Cricsheet Data Extractor</h1>
-            <p class="text-gray-400 mt-2">Upload Cricsheet JSON files to convert them into a detailed CSV.</p>
+            <p class="text-gray-400 mt-2">Upload Cricsheet JSON files to convert them into a detailed, merged CSV.</p>
         </div>
 
         <!-- File Upload Section -->
@@ -62,10 +62,15 @@
         <!-- File List & Actions -->
         <div id="file-list-container" class="hidden">
              <div id="file-list" class="space-y-2 text-sm"></div>
+             <p id="merge-note" class="text-xs text-gray-500 mt-3 text-center sm:text-left">Note: All selected files will be merged into a single output file.</p>
              <div class="flex flex-col sm:flex-row gap-4 mt-6">
                  <button id="process-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      Process Files
+                 </button>
+                 <button id="clear-btn" class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Clear Selection
                  </button>
                  <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow sm:flex items-center gap-4">
                     <input type="text" id="csv-filename" placeholder="cricsheet_data.csv" class="bg-gray-700 text-white w-full sm:w-auto rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
@@ -94,6 +99,7 @@
         const fileListContainer = document.getElementById('file-list-container');
         const fileList = document.getElementById('file-list');
         const processBtn = document.getElementById('process-btn');
+        const clearBtn = document.getElementById('clear-btn');
         const downloadBtn = document.getElementById('download-btn');
         const downloadWrapper = document.getElementById('download-wrapper');
         const csvFilenameInput = document.getElementById('csv-filename');
@@ -105,14 +111,13 @@
         let processedData = [];
         let uploadedFiles = [];
 
-        // --- Drag and Drop Event Handlers ---
+        // --- Event Handlers ---
         fileDropArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             fileDropArea.classList.add('dragover');
         });
 
-        fileDropArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
+        fileDropArea.addEventListener('dragleave', () => {
             fileDropArea.classList.remove('dragover');
         });
 
@@ -127,6 +132,7 @@
         });
         
         fileInput.addEventListener('change', handleFileSelection);
+        clearBtn.addEventListener('click', clearSelection);
 
         function handleFileSelection() {
             uploadedFiles = Array.from(fileInput.files);
@@ -144,6 +150,16 @@
             }
             // Reset state for new uploads
             processedData = [];
+            downloadWrapper.classList.add('hidden');
+            statusContainer.classList.add('hidden');
+            previewContainer.classList.add('hidden');
+        }
+        
+        function clearSelection() {
+            uploadedFiles = [];
+            fileInput.value = ''; // Resets the file input
+            fileList.innerHTML = '';
+            fileListContainer.classList.add('hidden');
             downloadWrapper.classList.add('hidden');
             statusContainer.classList.add('hidden');
             previewContainer.classList.add('hidden');
@@ -289,7 +305,7 @@
                             balls_remaining: ballsRemaining,
                             wickets_remaining: wicketsRemaining,
                             current_run_rate: currentRunRate.toFixed(2),
-                            required_run_rate: inningNum === 2 ? requiredRunRate.toFixed(2) : '',
+                            required_run_rate: inningNum === 2 ? (isFinite(requiredRunRate) ? requiredRunRate.toFixed(2) : 'inf') : '',
                             target_score: inningNum === 2 ? targetRuns : '',
                             wicket_kind: wicketInfo.kind || '',
                             player_out: wicketInfo.player_out || '',
