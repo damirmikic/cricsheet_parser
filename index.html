@@ -72,12 +72,18 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     Clear Selection
                  </button>
-                 <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow sm:flex items-center gap-4">
-                    <input type="text" id="csv-filename" placeholder="cricsheet_data.csv" class="bg-gray-700 text-white w-full sm:w-auto rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
-                    <button id="download-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Download CSV
-                    </button>
+                 <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow flex-col sm:flex-row flex items-stretch sm:items-center gap-4">
+                    <input type="text" id="output-filename" placeholder="cricsheet_data" class="bg-gray-700 text-white w-full sm:w-auto flex-grow rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
+                    <div class="flex gap-4">
+                        <button id="download-csv-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            CSV
+                        </button>
+                        <button id="download-json-btn" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                            JSON
+                        </button>
+                    </div>
                  </div>
              </div>
         </div>
@@ -100,9 +106,10 @@
         const fileList = document.getElementById('file-list');
         const processBtn = document.getElementById('process-btn');
         const clearBtn = document.getElementById('clear-btn');
-        const downloadBtn = document.getElementById('download-btn');
+        const downloadCsvBtn = document.getElementById('download-csv-btn');
+        const downloadJsonBtn = document.getElementById('download-json-btn');
         const downloadWrapper = document.getElementById('download-wrapper');
-        const csvFilenameInput = document.getElementById('csv-filename');
+        const outputFilenameInput = document.getElementById('output-filename');
         const statusContainer = document.getElementById('status-container');
         const statusMessage = document.getElementById('status-message');
         const previewContainer = document.getElementById('preview-container');
@@ -131,7 +138,7 @@
             }
         });
         
-        fileInput.addEventListener('change', handleFileSelection);
+        fileDropArea.addEventListener('change', handleFileSelection);
         clearBtn.addEventListener('click', clearSelection);
 
         function handleFileSelection() {
@@ -360,13 +367,13 @@
             previewTable.appendChild(table);
         }
 
-        downloadBtn.addEventListener('click', () => {
+        downloadCsvBtn.addEventListener('click', () => {
             if (processedData.length === 0) {
                 alert('No data to download.');
                 return;
             }
 
-            let filename = csvFilenameInput.value.trim();
+            let filename = outputFilenameInput.value.trim();
             if (!filename) {
                 filename = 'cricsheet_data.csv';
             }
@@ -387,6 +394,34 @@
 
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        downloadJsonBtn.addEventListener('click', () => {
+            if (processedData.length === 0) {
+                alert('No data to download.');
+                return;
+            }
+
+            let filename = outputFilenameInput.value.trim();
+            if (!filename) {
+                filename = 'cricsheet_data.json';
+            }
+            if (!filename.toLowerCase().endsWith('.json')) {
+                filename += '.json';
+            }
+
+            const jsonString = JSON.stringify(processedData, null, 2); // Pretty print JSON
+            const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
