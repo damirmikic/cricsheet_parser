@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricsheet JSON to CSV Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a clean, modern look */
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .file-drop-area {
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .file-drop-area.dragover {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #374151; /* gray-700 */
+        }
+        #preview-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        /* Custom scrollbar for table */
+        #preview-table::-webkit-scrollbar {
+            width: 8px;
+        }
+        #preview-table::-webkit-scrollbar-track {
+            background: #2d3748; /* gray-800 */
+        }
+        #preview-table::-webkit-scrollbar-thumb {
+            background-color: #4a5568; /* gray-600 */
+            border-radius: 10px;
+            border: 2px solid #2d3748; /* gray-800 */
+        }
+    </style>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <div class="container w-full mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-10 space-y-8">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-white">Cricsheet Data Extractor</h1>
+            <p class="text-gray-400 mt-2">Upload Cricsheet JSON files to convert them into a detailed CSV.</p>
+        </div>
+
+        <!-- File Upload Section -->
+        <div id="file-drop-area" class="relative border-4 border-dashed border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-700/50">
+            <input type="file" id="file-input" multiple accept=".json" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <div class="flex flex-col items-center justify-center space-y-4">
+                 <svg class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <p class="text-lg text-gray-400"><span class="font-semibold text-blue-400">Click to upload</span> or drag and drop</p>
+                <p class="text-sm text-gray-500">Supports multiple JSON files</p>
+            </div>
+        </div>
+        
+        <!-- File List & Actions -->
+        <div id="file-list-container" class="hidden">
+             <div id="file-list" class="space-y-2 text-sm"></div>
+             <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                 <button id="process-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                     Process Files
+                 </button>
+                 <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow sm:flex items-center gap-4">
+                    <input type="text" id="csv-filename" placeholder="cricsheet_data.csv" class="bg-gray-700 text-white w-full sm:w-auto rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
+                    <button id="download-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download CSV
+                    </button>
+                 </div>
+             </div>
+        </div>
+        
+        <!-- Status & Preview Section -->
+        <div id="status-container" class="hidden pt-6 border-t border-gray-700">
+            <p id="status-message" class="text-center text-gray-400 mb-4"></p>
+            <div id="preview-container" class="hidden bg-gray-900 rounded-lg shadow-inner">
+                <div id="preview-table" class="w-full text-left text-sm text-gray-300 rounded-lg">
+                    <!-- Preview table will be generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const fileDropArea = document.getElementById('file-drop-area');
+        const fileListContainer = document.getElementById('file-list-container');
+        const fileList = document.getElementById('file-list');
+        const processBtn = document.getElementById('process-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const downloadWrapper = document.getElementById('download-wrapper');
+        const csvFilenameInput = document.getElementById('csv-filename');
+        const statusContainer = document.getElementById('status-container');
+        const statusMessage = document.getElementById('status-message');
+        const previewContainer = document.getElementById('preview-container');
+        const previewTable = document.getElementById('preview-table');
+
+        let processedData = [];
+        let uploadedFiles = [];
+
+        // --- Drag and Drop Event Handlers ---
+        fileDropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropArea.classList.add('dragover');
+        });
+
+        fileDropArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileDropArea.classList.remove('dragover');
+        });
+
+        fileDropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                handleFileSelection();
+            }
+        });
+        
+        fileInput.addEventListener('change', handleFileSelection);
+
+        function handleFileSelection() {
+            uploadedFiles = Array.from(fileInput.files);
+            fileList.innerHTML = ''; // Clear previous list
+            if (uploadedFiles.length > 0) {
+                fileListContainer.classList.remove('hidden');
+                uploadedFiles.forEach(file => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'bg-gray-700 p-2 rounded flex items-center justify-between';
+                    fileElement.innerHTML = `<span>${file.name}</span> <span class="text-gray-500">${(file.size / 1024).toFixed(2)} KB</span>`;
+                    fileList.appendChild(fileElement);
+                });
+            } else {
+                fileListContainer.classList.add('hidden');
+            }
+            // Reset state for new uploads
+            processedData = [];
+            downloadWrapper.classList.add('hidden');
+            statusContainer.classList.add('hidden');
+            previewContainer.classList.add('hidden');
+        }
+
+        processBtn.addEventListener('click', async () => {
+            if (uploadedFiles.length === 0) {
+                statusMessage.textContent = 'Please select files to process.';
+                statusContainer.classList.remove('hidden');
+                return;
+            }
+
+            statusMessage.textContent = 'Processing... This may take a moment for large files.';
+            statusContainer.classList.remove('hidden');
+            downloadWrapper.classList.add('hidden');
+            previewContainer.classList.add('hidden');
+            processedData = [];
+
+            const fileReadPromises = uploadedFiles.map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            const matchData = processMatchData(data, file.name);
+                            resolve(matchData);
+                        } catch (e) {
+                            console.error(`Error parsing ${file.name}:`, e);
+                            reject(`Error parsing ${file.name}.`);
+                        }
+                    };
+                    reader.onerror = (error) => reject(`Error reading ${file.name}.`);
+                    reader.readAsText(file);
+                });
+            });
+
+            try {
+                const results = await Promise.all(fileReadPromises);
+                processedData = results.flat(); // Flatten array of arrays
+                
+                statusMessage.textContent = `✅ Successfully processed ${uploadedFiles.length} file(s), generating ${processedData.length} ball-by-ball records.`;
+                if (processedData.length > 0) {
+                    displayPreview(processedData);
+                    downloadWrapper.classList.remove('hidden');
+                } else {
+                    statusMessage.textContent += ' No data found to process.';
+                }
+            } catch (error) {
+                statusMessage.textContent = `❌ ${error}`;
+            }
+        });
+
+        function processMatchData(data, fileName) {
+            const matchId = fileName.split('.')[0];
+            const info = data.info || {};
+            const playerOfMatchData = info.player_of_match || [];
+            const playerOfMatch = playerOfMatchData.length > 0 ? playerOfMatchData[0] : '';
+            const outcome = info.outcome || {};
+            const byRuns = outcome.by && outcome.by.runs;
+            
+            const matchData = {
+                match_id: matchId,
+                season: info.season || '',
+                date: (info.dates && info.dates[0]) || '',
+                city: info.city || '',
+                venue: info.venue || '',
+                team1: (info.teams && info.teams[0]) || '',
+                team2: (info.teams && info.teams[1]) || '',
+                toss_winner: (info.toss && info.toss.winner) || '',
+                toss_decision: (info.toss && info.toss.decision) || '',
+                winner: outcome.winner || 'N/A',
+                result: byRuns !== undefined ? 'runs' : 'wickets',
+                result_margin: byRuns !== undefined ? byRuns : (outcome.by && outcome.by.wickets),
+                player_of_match: playerOfMatch
+            };
+
+            const allDeliveries = [];
+            let targetRuns = null;
+            if (data.innings && data.innings.length > 1 && data.innings[1].target) {
+                targetRuns = data.innings[1].target.runs;
+            }
+
+            data.innings.forEach((inningData, i) => {
+                const inningNum = i + 1;
+                const battingTeam = inningData.team;
+                const bowlingTeam = battingTeam === matchData.team1 ? matchData.team2 : matchData.team1;
+
+                let currentScore = 0;
+                let wicketsDown = 0;
+                let totalBallsInInning = 0;
+                
+                inningData.overs.forEach((overData, overNum) => {
+                    overData.deliveries.forEach((delivery, ballNum) => {
+                        if (delivery.extras && (delivery.extras.wides || delivery.extras.noballs)) {
+                            // Do not increment totalBallsInInning for wides/noballs
+                        } else {
+                            totalBallsInInning++;
+                        }
+                        
+                        const runsScored = delivery.runs.batter;
+                        const extras = delivery.runs.extras;
+                        const totalRunsDelivery = delivery.runs.total;
+                        
+                        currentScore += totalRunsDelivery;
+
+                        const isWicket = delivery.wickets && delivery.wickets.length > 0;
+                        if (isWicket) {
+                            wicketsDown++;
+                        }
+                        
+                        const ballsRemaining = 120 - totalBallsInInning;
+                        const wicketsRemaining = 10 - wicketsDown;
+                        const oversCompleted = Math.floor((totalBallsInInning - 1) / 6) + ((totalBallsInInning -1) % 6 + 1) / 6;
+                        const currentRunRate = oversCompleted > 0 ? (currentScore / oversCompleted) : 0;
+                        
+                        let requiredRunRate = 0.0;
+                        if (inningNum === 2 && targetRuns) {
+                            const runsNeeded = targetRuns - currentScore;
+                            if (ballsRemaining > 0) {
+                                requiredRunRate = (runsNeeded / ballsRemaining) * 6;
+                            } else {
+                                requiredRunRate = runsNeeded > 0 ? Infinity : 0;
+                            }
+                        }
+
+                        const wicketInfo = isWicket ? delivery.wickets[0] : {};
+                        const fielderInfo = wicketInfo.fielders && wicketInfo.fielders[0] ? wicketInfo.fielders[0].name : '';
+
+                        const row = {
+                            ...matchData,
+                            inning: inningNum,
+                            batting_team: battingTeam,
+                            bowling_team: bowlingTeam,
+                            over: overNum,
+                            ball: ballNum + 1,
+                            batter: delivery.batter,
+                            bowler: delivery.bowler,
+                            non_striker: delivery.non_striker,
+                            runs_scored: runsScored,
+                            extras: extras,
+                            current_score: currentScore,
+                            wickets_down: wicketsDown,
+                            balls_remaining: ballsRemaining,
+                            wickets_remaining: wicketsRemaining,
+                            current_run_rate: currentRunRate.toFixed(2),
+                            required_run_rate: inningNum === 2 ? requiredRunRate.toFixed(2) : '',
+                            target_score: inningNum === 2 ? targetRuns : '',
+                            wicket_kind: wicketInfo.kind || '',
+                            player_out: wicketInfo.player_out || '',
+                            fielder: fielderInfo
+                        };
+                        allDeliveries.push(row);
+                    });
+                });
+            });
+            return allDeliveries;
+        }
+
+        function displayPreview(data) {
+            previewTable.innerHTML = '';
+            previewContainer.classList.remove('hidden');
+            const previewData = data.slice(0, 50); // Show first 50 rows
+
+            if (previewData.length === 0) return;
+
+            const headers = Object.keys(previewData[0]);
+            
+            const table = document.createElement('table');
+            table.className = 'min-w-full divide-y divide-gray-700';
+            
+            const thead = document.createElement('thead');
+            thead.className = 'bg-gray-800 sticky top-0';
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.scope = 'col';
+                th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider';
+                th.textContent = header.replace(/_/g, ' ');
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            const tbody = document.createElement('tbody');
+            tbody.className = 'bg-gray-900 divide-y divide-gray-800';
+            previewData.forEach(rowData => {
+                const row = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 whitespace-nowrap';
+                    td.textContent = rowData[header];
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            
+            previewTable.appendChild(table);
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            if (processedData.length === 0) {
+                alert('No data to download.');
+                return;
+            }
+
+            let filename = csvFilenameInput.value.trim();
+            if (!filename) {
+                filename = 'cricsheet_data.csv';
+            }
+            if (!filename.toLowerCase().endsWith('.csv')) {
+                filename += '.csv';
+            }
+
+            const headers = Object.keys(processedData[0]);
+            const csvRows = [headers.join(',')]; // Header row
+
+            processedData.forEach(row => {
+                const values = headers.map(header => {
+                    const escaped = ('' + row[header]).replace(/"/g, '""');
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            });
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
+
