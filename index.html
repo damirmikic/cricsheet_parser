@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cricsheet JSON to CSV Converter</title>
+    <title>Cricsheet Data Extractor</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='none' stroke='white' stroke-width='5'/><path d='M15,25 A50,50 0 0,1 85,75' stroke='white' stroke-width='5' fill='none'/><path d='M15,75 A50,50 0 0,0 85,25' stroke='white' stroke-width='5' fill='none'/></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -76,6 +76,10 @@
                  <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow flex-col sm:flex-row flex items-stretch sm:items-center gap-4">
                     <input type="text" id="output-filename" placeholder="cricsheet_data" class="bg-gray-700 text-white w-full sm:w-auto flex-grow rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
                     <div class="flex gap-4">
+                        <button id="download-summary-btn" class="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
+                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            Summary
+                        </button>
                         <button id="download-csv-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                             CSV
@@ -107,6 +111,7 @@
         const fileList = document.getElementById('file-list');
         const processBtn = document.getElementById('process-btn');
         const clearBtn = document.getElementById('clear-btn');
+        const downloadSummaryBtn = document.getElementById('download-summary-btn');
         const downloadCsvBtn = document.getElementById('download-csv-btn');
         const downloadJsonBtn = document.getElementById('download-json-btn');
         const downloadWrapper = document.getElementById('download-wrapper');
@@ -117,6 +122,7 @@
         const previewTable = document.getElementById('preview-table');
 
         let processedData = [];
+        let summarizedData = [];
         let uploadedFiles = [];
 
         // --- Event Handlers ---
@@ -139,7 +145,7 @@
             }
         });
         
-        fileDropArea.addEventListener('change', handleFileSelection);
+        fileInput.addEventListener('change', handleFileSelection);
         clearBtn.addEventListener('click', clearSelection);
 
         function handleFileSelection() {
@@ -158,6 +164,7 @@
             }
             // Reset state for new uploads
             processedData = [];
+            summarizedData = [];
             downloadWrapper.classList.add('hidden');
             statusContainer.classList.add('hidden');
             previewContainer.classList.add('hidden');
@@ -185,6 +192,7 @@
             downloadWrapper.classList.add('hidden');
             previewContainer.classList.add('hidden');
             processedData = [];
+            summarizedData = [];
 
             const fileReadPromises = uploadedFiles.map(file => {
                 return new Promise((resolve, reject) => {
@@ -192,8 +200,9 @@
                     reader.onload = (event) => {
                         try {
                             const data = JSON.parse(event.target.result);
-                            const matchData = processMatchData(data, file.name);
-                            resolve(matchData);
+                            const detailed = processMatchData(data, file.name);
+                            const summary = processMatchSummary(data, file.name);
+                            resolve({ detailed, summary });
                         } catch (e) {
                             console.error(`Error parsing ${file.name}:`, e);
                             reject(`Error parsing ${file.name}.`);
@@ -206,7 +215,8 @@
 
             try {
                 const results = await Promise.all(fileReadPromises);
-                processedData = results.flat(); // Flatten array of arrays
+                processedData = results.map(r => r.detailed).flat();
+                summarizedData = results.map(r => r.summary);
                 
                 statusMessage.textContent = `✅ Successfully processed ${uploadedFiles.length} file(s), generating ${processedData.length} ball-by-ball records.`;
                 if (processedData.length > 0) {
@@ -219,6 +229,50 @@
                 statusMessage.textContent = `❌ ${error}`;
             }
         });
+
+        function processMatchSummary(data, fileName) {
+            const matchId = fileName.split('.')[0];
+            const info = data.info || {};
+            const playerOfMatchData = info.player_of_match || [];
+            const playerOfMatch = playerOfMatchData.length > 0 ? playerOfMatchData[0] : '';
+            const outcome = info.outcome || {};
+            const byRuns = outcome.by && outcome.by.runs;
+
+            const summary = {
+                match_id: matchId,
+                season: info.season || '',
+                date: (info.dates && info.dates[0]) || '',
+                city: info.city || '',
+                venue: info.venue || '',
+                team1: (info.teams && info.teams[0]) || '',
+                team2: (info.teams && info.teams[1]) || '',
+                toss_winner: (info.toss && info.toss.winner) || '',
+                toss_decision: (info.toss && info.toss.decision) || '',
+                winner: outcome.winner || 'N/A',
+                result: byRuns !== undefined ? 'runs' : 'wickets',
+                result_margin: byRuns !== undefined ? byRuns : (outcome.by && outcome.by.wickets),
+                player_of_match: playerOfMatch
+            };
+
+            (data.innings || []).forEach((inningData, i) => {
+                const inningNum = i + 1;
+                let totalRuns = 0;
+                let totalWickets = 0;
+                (inningData.overs || []).forEach(overData => {
+                    (overData.deliveries || []).forEach(delivery => {
+                        totalRuns += delivery.runs.total;
+                        if (delivery.wickets && delivery.wickets.length > 0) {
+                            totalWickets++;
+                        }
+                    });
+                });
+                summary[`inning_${inningNum}_team`] = inningData.team;
+                summary[`inning_${inningNum}_runs`] = totalRuns;
+                summary[`inning_${inningNum}_wickets`] = totalWickets;
+            });
+
+            return summary;
+        }
 
         function processMatchData(data, fileName) {
             const matchId = fileName.split('.')[0];
@@ -368,33 +422,43 @@
             previewTable.appendChild(table);
         }
 
-        downloadCsvBtn.addEventListener('click', () => {
-            if (processedData.length === 0) {
+        function downloadCSV(data, defaultFilename) {
+             if (!data || data.length === 0) {
                 alert('No data to download.');
                 return;
             }
 
             let filename = outputFilenameInput.value.trim();
             if (!filename) {
-                filename = 'cricsheet_data.csv';
+                filename = defaultFilename;
+            } else {
+                 filename = defaultFilename.includes('_summary') 
+                    ? `${filename}_summary.csv`
+                    : `${filename}.csv`;
             }
+
             if (!filename.toLowerCase().endsWith('.csv')) {
                 filename += '.csv';
             }
 
-            const headers = Object.keys(processedData[0]);
-            const csvRows = [headers.join(',')]; // Header row
+            const headers = Object.keys(data[0]);
+            const csvRows = [headers.join(',')];
 
-            processedData.forEach(row => {
+            data.forEach(row => {
                 const values = headers.map(header => {
-                    const escaped = ('' + row[header]).replace(/"/g, '""');
+                    const value = row[header] !== undefined && row[header] !== null ? row[header] : '';
+                    const escaped = ('' + value).replace(/"/g, '""');
                     return `"${escaped}"`;
                 });
                 csvRows.push(values.join(','));
             });
 
             const csvString = csvRows.join('\n');
-            const blob = new Blob([csvString], { type: 'text/csv' });
+            triggerDownload(csvString, 'text/csv', filename);
+        }
+
+        function triggerDownload(content, mimeType, filename) {
+            const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
             
             const a = document.createElement('a');
@@ -405,6 +469,14 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        }
+
+        downloadSummaryBtn.addEventListener('click', () => {
+            downloadCSV(summarizedData, 'cricsheet_summary.csv');
+        });
+        
+        downloadCsvBtn.addEventListener('click', () => {
+            downloadCSV(processedData, 'cricsheet_detailed.csv');
         });
 
         downloadJsonBtn.addEventListener('click', () => {
@@ -422,17 +494,7 @@
             }
 
             const jsonString = JSON.stringify(processedData, null, 2); // Pretty print JSON
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.setAttribute('hidden', '');
-            a.setAttribute('href', url);
-            a.setAttribute('download', filename);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            triggerDownload(jsonString, 'application/json', filename);
         });
     </script>
 </body>
