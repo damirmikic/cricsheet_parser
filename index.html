@@ -8,6 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for a clean, modern look */
+        html {
+            scroll-behavior: smooth;
+        }
         body {
             font-family: 'Inter', sans-serif;
             transition: background-color 0.3s;
@@ -22,21 +25,25 @@
             border-color: #3b82f6; /* blue-500 */
             background-color: #374151; /* gray-700 */
         }
-        #preview-table {
+        #preview-table-container {
             max-height: 400px;
             overflow-y: auto;
         }
         /* Custom scrollbar for table */
-        #preview-table::-webkit-scrollbar {
+        #preview-table-container::-webkit-scrollbar {
             width: 8px;
         }
-        #preview-table::-webkit-scrollbar-track {
+        #preview-table-container::-webkit-scrollbar-track {
             background: #2d3748; /* gray-800 */
         }
-        #preview-table::-webkit-scrollbar-thumb {
+        #preview-table-container::-webkit-scrollbar-thumb {
             background-color: #4a5568; /* gray-600 */
             border-radius: 10px;
             border: 2px solid #2d3748; /* gray-800 */
+        }
+        .tab-button.active {
+            background-color: #3b82f6;
+            color: white;
         }
     </style>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
@@ -47,7 +54,7 @@
         <!-- Header -->
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white">Cricsheet Data Extractor</h1>
-            <p class="text-gray-400 mt-2">Upload Cricsheet JSON files to convert them into a detailed, merged CSV.</p>
+            <p class="text-gray-400 mt-2">Upload, analyze, and export detailed cricket match data.</p>
         </div>
 
         <!-- File Upload Section -->
@@ -61,10 +68,12 @@
         </div>
         
         <!-- File List & Actions -->
-        <div id="file-list-container" class="hidden">
-             <div id="file-list" class="space-y-2 text-sm"></div>
-             <p id="merge-note" class="text-xs text-gray-500 mt-3 text-center sm:text-left">Note: All selected files will be merged into a single output file.</p>
-             <div class="flex flex-col sm:flex-row gap-4 mt-6">
+        <div id="actions-section" class="space-y-6">
+            <div id="file-list-container" class="hidden">
+                 <div id="file-list" class="space-y-2 text-sm"></div>
+                 <p id="merge-note" class="text-xs text-gray-500 mt-3 text-center sm:text-left">Note: All selected files will be merged into a single output file.</p>
+            </div>
+             <div class="flex flex-col sm:flex-row gap-4">
                  <button id="process-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                      Process Files
@@ -73,9 +82,42 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     Clear Selection
                  </button>
-                 <div id="download-wrapper" class="hidden w-full sm:w-auto sm:flex-grow flex-col sm:flex-row flex items-stretch sm:items-center gap-4">
+             </div>
+        </div>
+        
+        <!-- Status & Preview Section -->
+        <div id="status-container" class="hidden pt-6 border-t border-gray-700 space-y-4">
+            <p id="status-message" class="text-center text-gray-400"></p>
+            
+            <div id="results-wrapper" class="hidden space-y-4">
+                <!-- Preview Tabs -->
+                <div class="flex border-b border-gray-700">
+                    <button data-tab="detailed" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition active">Detailed</button>
+                    <button data-tab="summary" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition">Match Summary</button>
+                    <button data-tab="stats" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition">Player Stats</button>
+                </div>
+                
+                <!-- Advanced Filters -->
+                <div id="filters-container" class="flex flex-col sm:flex-row gap-4">
+                    <select id="inning-filter" class="bg-gray-700 text-white w-full sm:w-1/2 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
+                        <option value="all">All Innings</option>
+                    </select>
+                    <select id="team-filter" class="bg-gray-700 text-white w-full sm:w-1/2 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
+                        <option value="all">All Batting Teams</option>
+                    </select>
+                </div>
+                
+                <!-- Preview Table -->
+                <div id="preview-container" class="bg-gray-900 rounded-lg shadow-inner">
+                    <div id="preview-table-container" class="w-full text-left text-sm text-gray-300 rounded-lg">
+                        <!-- Preview table will be generated here -->
+                    </div>
+                </div>
+
+                <!-- Download Actions -->
+                <div id="download-wrapper" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-700">
                     <input type="text" id="output-filename" placeholder="cricsheet_data" class="bg-gray-700 text-white w-full sm:w-auto flex-grow rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
-                    <div class="flex gap-4">
+                    <div class="flex flex-wrap gap-4">
                         <button id="download-summary-btn" class="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg flex items-center justify-center gap-2">
                              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                             Summary
@@ -89,68 +131,86 @@
                             JSON
                         </button>
                     </div>
-                 </div>
-             </div>
-        </div>
-        
-        <!-- Status & Preview Section -->
-        <div id="status-container" class="hidden pt-6 border-t border-gray-700">
-            <p id="status-message" class="text-center text-gray-400 mb-4"></p>
-            <div id="preview-container" class="hidden bg-gray-900 rounded-lg shadow-inner">
-                <div id="preview-table" class="w-full text-left text-sm text-gray-300 rounded-lg">
-                    <!-- Preview table will be generated here -->
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- Floating Action Button -->
+    <button id="scroll-to-actions-btn" class="hidden fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+    </button>
+
 
     <script>
+        // DOM Elements
         const fileInput = document.getElementById('file-input');
         const fileDropArea = document.getElementById('file-drop-area');
         const fileListContainer = document.getElementById('file-list-container');
         const fileList = document.getElementById('file-list');
         const processBtn = document.getElementById('process-btn');
         const clearBtn = document.getElementById('clear-btn');
+        const statusContainer = document.getElementById('status-container');
+        const statusMessage = document.getElementById('status-message');
+        const resultsWrapper = document.getElementById('results-wrapper');
+        const previewContainer = document.getElementById('preview-container');
+        const previewTableContainer = document.getElementById('preview-table-container');
+        const downloadWrapper = document.getElementById('download-wrapper');
+        const outputFilenameInput = document.getElementById('output-filename');
         const downloadSummaryBtn = document.getElementById('download-summary-btn');
         const downloadCsvBtn = document.getElementById('download-csv-btn');
         const downloadJsonBtn = document.getElementById('download-json-btn');
-        const downloadWrapper = document.getElementById('download-wrapper');
-        const outputFilenameInput = document.getElementById('output-filename');
-        const statusContainer = document.getElementById('status-container');
-        const statusMessage = document.getElementById('status-message');
-        const previewContainer = document.getElementById('preview-container');
-        const previewTable = document.getElementById('preview-table');
-
+        const scrollToActionsBtn = document.getElementById('scroll-to-actions-btn');
+        const actionsSection = document.getElementById('actions-section');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const filtersContainer = document.getElementById('filters-container');
+        const inningFilter = document.getElementById('inning-filter');
+        const teamFilter = document.getElementById('team-filter');
+        
+        // State
         let processedData = [];
         let summarizedData = [];
+        let playerStats = [];
         let uploadedFiles = [];
+        let activeTab = 'detailed';
 
-        // --- Event Handlers ---
-        fileDropArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileDropArea.classList.add('dragover');
-        });
-
-        fileDropArea.addEventListener('dragleave', () => {
-            fileDropArea.classList.remove('dragover');
-        });
-
-        fileDropArea.addEventListener('drop', (e) => {
+        // --- Event Listeners ---
+        fileDropArea.addEventListener('dragover', e => { e.preventDefault(); fileDropArea.classList.add('dragover'); });
+        fileDropArea.addEventListener('dragleave', () => fileDropArea.classList.remove('dragover'));
+        fileDropArea.addEventListener('drop', e => {
             e.preventDefault();
             fileDropArea.classList.remove('dragover');
             const files = e.dataTransfer.files;
-            if (files.length) {
-                fileInput.files = files;
-                handleFileSelection();
-            }
+            if (files.length) { fileInput.files = files; handleFileSelection(); }
         });
-        
         fileInput.addEventListener('change', handleFileSelection);
         clearBtn.addEventListener('click', clearSelection);
+        processBtn.addEventListener('click', processFiles);
+        scrollToActionsBtn.addEventListener('click', () => actionsSection.scrollIntoView({ behavior: 'smooth' }));
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > fileDropArea.offsetHeight) {
+                scrollToActionsBtn.classList.remove('hidden');
+            } else {
+                scrollToActionsBtn.classList.add('hidden');
+            }
+        });
+        tabButtons.forEach(button => button.addEventListener('click', handleTabClick));
+        inningFilter.addEventListener('change', applyFilters);
+        teamFilter.addEventListener('change', applyFilters);
+
+        // --- Core Functions ---
+        function resetState() {
+            processedData = [];
+            summarizedData = [];
+            playerStats = [];
+            resultsWrapper.classList.add('hidden');
+            statusContainer.classList.add('hidden');
+            previewContainer.classList.add('hidden');
+        }
 
         function handleFileSelection() {
             uploadedFiles = Array.from(fileInput.files);
-            fileList.innerHTML = ''; // Clear previous list
+            fileList.innerHTML = '';
             if (uploadedFiles.length > 0) {
                 fileListContainer.classList.remove('hidden');
                 uploadedFiles.forEach(file => {
@@ -162,74 +222,91 @@
             } else {
                 fileListContainer.classList.add('hidden');
             }
-            // Reset state for new uploads
-            processedData = [];
-            summarizedData = [];
-            downloadWrapper.classList.add('hidden');
-            statusContainer.classList.add('hidden');
-            previewContainer.classList.add('hidden');
+            resetState();
         }
         
         function clearSelection() {
             uploadedFiles = [];
-            fileInput.value = ''; // Resets the file input
+            fileInput.value = '';
             fileList.innerHTML = '';
             fileListContainer.classList.add('hidden');
-            downloadWrapper.classList.add('hidden');
-            statusContainer.classList.add('hidden');
-            previewContainer.classList.add('hidden');
+            resetState();
         }
 
-        processBtn.addEventListener('click', async () => {
+        async function processFiles() {
             if (uploadedFiles.length === 0) {
                 statusMessage.textContent = 'Please select files to process.';
                 statusContainer.classList.remove('hidden');
                 return;
             }
-
             statusMessage.textContent = 'Processing... This may take a moment for large files.';
             statusContainer.classList.remove('hidden');
-            downloadWrapper.classList.add('hidden');
-            previewContainer.classList.add('hidden');
-            processedData = [];
-            summarizedData = [];
-
-            const fileReadPromises = uploadedFiles.map(file => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        try {
-                            const data = JSON.parse(event.target.result);
-                            const detailed = processMatchData(data, file.name);
-                            const summary = processMatchSummary(data, file.name);
-                            resolve({ detailed, summary });
-                        } catch (e) {
-                            console.error(`Error parsing ${file.name}:`, e);
-                            reject(`Error parsing ${file.name}.`);
-                        }
-                    };
-                    reader.onerror = (error) => reject(`Error reading ${file.name}.`);
-                    reader.readAsText(file);
-                });
-            });
+            resultsWrapper.classList.add('hidden');
 
             try {
-                const results = await Promise.all(fileReadPromises);
-                processedData = results.map(r => r.detailed).flat();
+                const results = await Promise.all(uploadedFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = event => {
+                            try {
+                                const data = JSON.parse(event.target.result);
+                                resolve({
+                                    detailed: processMatchData(data, file.name),
+                                    summary: processMatchSummary(data, file.name)
+                                });
+                            } catch (e) { reject(`Error parsing ${file.name}.`); }
+                        };
+                        reader.onerror = () => reject(`Error reading ${file.name}.`);
+                        reader.readAsText(file);
+                    });
+                }));
+
+                processedData = results.flatMap(r => r.detailed);
                 summarizedData = results.map(r => r.summary);
+                playerStats = processPlayerStats(processedData);
                 
                 statusMessage.textContent = `✅ Successfully processed ${uploadedFiles.length} file(s), generating ${processedData.length} ball-by-ball records.`;
                 if (processedData.length > 0) {
-                    displayPreview(processedData);
-                    downloadWrapper.classList.remove('hidden');
+                    populateFilters();
+                    displayPreview();
+                    resultsWrapper.classList.remove('hidden');
                 } else {
                     statusMessage.textContent += ' No data found to process.';
                 }
             } catch (error) {
                 statusMessage.textContent = `❌ ${error}`;
             }
-        });
+        }
 
+        function processPlayerStats(detailedData) {
+            const stats = {};
+            
+            detailedData.forEach(d => {
+                // Batter stats
+                if (!stats[d.batter]) stats[d.batter] = { runs: 0, balls: 0, wickets: 0, overs: 0, runs_conceded: 0 };
+                stats[d.batter].runs += d.runs_scored;
+                stats[d.batter].balls += 1;
+
+                // Bowler stats
+                if (!stats[d.bowler]) stats[d.bowler] = { runs: 0, balls: 0, wickets: 0, overs: 0, runs_conceded: 0 };
+                if (d.wicket_kind && d.wicket_kind !== 'run out') {
+                     stats[d.bowler].wickets += 1;
+                }
+                stats[d.bowler].runs_conceded += (d.runs_scored + d.extras); // Simplified concession
+                stats[d.bowler].overs += 1/6;
+            });
+            
+            return Object.entries(stats).map(([player, data]) => ({
+                player,
+                runs_scored: data.runs,
+                balls_faced: data.balls,
+                wickets_taken: data.wickets,
+                runs_conceded: data.runs_conceded,
+                overs_bowled: parseFloat(data.overs.toFixed(1))
+            })).sort((a, b) => b.runs_scored - a.runs_scored);
+        }
+
+        // --- Data Processing (unchanged logic for match summary and detailed) ---
         function processMatchSummary(data, fileName) {
             const matchId = fileName.split('.')[0];
             const info = data.info || {};
@@ -315,42 +392,28 @@
                 
                 inningData.overs.forEach((overData, overNum) => {
                     overData.deliveries.forEach((delivery, ballNum) => {
-                        if (delivery.extras && (delivery.extras.wides || delivery.extras.noballs)) {
-                            // Do not increment totalBallsInInning for wides/noballs
-                        } else {
+                        if (!(delivery.extras && (delivery.extras.wides || delivery.extras.noballs))) {
                             totalBallsInInning++;
                         }
                         
-                        const runsScored = delivery.runs.batter;
-                        const extras = delivery.runs.extras;
-                        const totalRunsDelivery = delivery.runs.total;
-                        
-                        currentScore += totalRunsDelivery;
-
+                        currentScore += delivery.runs.total;
                         const isWicket = delivery.wickets && delivery.wickets.length > 0;
-                        if (isWicket) {
-                            wicketsDown++;
-                        }
+                        if (isWicket) wicketsDown++;
                         
                         const ballsRemaining = 120 - totalBallsInInning;
-                        const wicketsRemaining = 10 - wicketsDown;
-                        const oversCompleted = Math.floor((totalBallsInInning - 1) / 6) + ((totalBallsInInning -1) % 6 + 1) / 6;
+                        const oversCompleted = Math.floor((totalBallsInInning - 1) / 6) + (((totalBallsInInning -1) % 6 + 1) / 6);
                         const currentRunRate = oversCompleted > 0 ? (currentScore / oversCompleted) : 0;
                         
                         let requiredRunRate = 0.0;
                         if (inningNum === 2 && targetRuns) {
                             const runsNeeded = targetRuns - currentScore;
-                            if (ballsRemaining > 0) {
-                                requiredRunRate = (runsNeeded / ballsRemaining) * 6;
-                            } else {
-                                requiredRunRate = runsNeeded > 0 ? Infinity : 0;
-                            }
+                            requiredRunRate = ballsRemaining > 0 ? (runsNeeded / ballsRemaining) * 6 : (runsNeeded > 0 ? Infinity : 0);
                         }
 
                         const wicketInfo = isWicket ? delivery.wickets[0] : {};
                         const fielderInfo = wicketInfo.fielders && wicketInfo.fielders[0] ? wicketInfo.fielders[0].name : '';
 
-                        const row = {
+                        allDeliveries.push({
                             ...matchData,
                             inning: inningNum,
                             batting_team: battingTeam,
@@ -360,44 +423,83 @@
                             batter: delivery.batter,
                             bowler: delivery.bowler,
                             non_striker: delivery.non_striker,
-                            runs_scored: runsScored,
-                            extras: extras,
+                            runs_scored: delivery.runs.batter,
+                            extras: delivery.runs.extras,
                             current_score: currentScore,
                             wickets_down: wicketsDown,
                             balls_remaining: ballsRemaining,
-                            wickets_remaining: wicketsRemaining,
+                            wickets_remaining: 10 - wicketsDown,
                             current_run_rate: currentRunRate.toFixed(2),
                             required_run_rate: inningNum === 2 ? (isFinite(requiredRunRate) ? requiredRunRate.toFixed(2) : 'inf') : '',
                             target_score: inningNum === 2 ? targetRuns : '',
                             wicket_kind: wicketInfo.kind || '',
                             player_out: wicketInfo.player_out || '',
                             fielder: fielderInfo
-                        };
-                        allDeliveries.push(row);
+                        });
                     });
                 });
             });
             return allDeliveries;
         }
 
-        function displayPreview(data) {
-            previewTable.innerHTML = '';
-            previewContainer.classList.remove('hidden');
-            const previewData = data.slice(0, 50); // Show first 50 rows
+        // --- UI & Display Functions ---
+        function handleTabClick(e) {
+            activeTab = e.target.dataset.tab;
+            tabButtons.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            filtersContainer.style.display = activeTab === 'detailed' ? 'flex' : 'none';
+            displayPreview();
+        }
 
-            if (previewData.length === 0) return;
-
-            const headers = Object.keys(previewData[0]);
+        function populateFilters() {
+            const innings = [...new Set(processedData.map(d => d.inning))];
+            const teams = [...new Set(processedData.map(d => d.batting_team))];
             
+            inningFilter.innerHTML = '<option value="all">All Innings</option>';
+            innings.forEach(i => inningFilter.innerHTML += `<option value="${i}">Inning ${i}</option>`);
+            
+            teamFilter.innerHTML = '<option value="all">All Batting Teams</option>';
+            teams.forEach(t => teamFilter.innerHTML += `<option value="${t}">${t}</option>`);
+        }
+        
+        function applyFilters() {
+            displayPreview();
+        }
+
+        function getFilteredData() {
+            const inning = inningFilter.value;
+            const team = teamFilter.value;
+            return processedData.filter(d => 
+                (inning === 'all' || d.inning == inning) &&
+                (team === 'all' || d.batting_team === team)
+            );
+        }
+
+        function displayPreview() {
+            let dataToDisplay;
+            switch(activeTab) {
+                case 'summary': dataToDisplay = summarizedData; break;
+                case 'stats': dataToDisplay = playerStats; break;
+                default: dataToDisplay = getFilteredData();
+            }
+
+            previewTableContainer.innerHTML = '';
+            previewContainer.classList.remove('hidden');
+            const previewData = dataToDisplay.slice(0, 100);
+
+            if (previewData.length === 0) {
+                previewTableContainer.innerHTML = `<p class="p-4 text-center text-gray-500">No data to display for the current selection.</p>`;
+                return;
+            }
+            
+            const headers = Object.keys(previewData[0]);
             const table = document.createElement('table');
             table.className = 'min-w-full divide-y divide-gray-700';
-            
             const thead = document.createElement('thead');
             thead.className = 'bg-gray-800 sticky top-0';
             const headerRow = document.createElement('tr');
             headers.forEach(header => {
                 const th = document.createElement('th');
-                th.scope = 'col';
                 th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider';
                 th.textContent = header.replace(/_/g, ' ');
                 headerRow.appendChild(th);
@@ -418,83 +520,45 @@
                 tbody.appendChild(row);
             });
             table.appendChild(tbody);
-            
-            previewTable.appendChild(table);
+            previewTableContainer.appendChild(table);
         }
 
+        // --- Download Functions ---
         function downloadCSV(data, defaultFilename) {
-             if (!data || data.length === 0) {
-                alert('No data to download.');
-                return;
-            }
-
-            let filename = outputFilenameInput.value.trim();
-            if (!filename) {
-                filename = defaultFilename;
-            } else {
-                 filename = defaultFilename.includes('_summary') 
-                    ? `${filename}_summary.csv`
-                    : `${filename}.csv`;
-            }
-
-            if (!filename.toLowerCase().endsWith('.csv')) {
-                filename += '.csv';
-            }
+             if (!data || data.length === 0) { alert('No data for the current selection.'); return; }
+            let filename = outputFilenameInput.value.trim() || defaultFilename.split('.')[0];
+            filename = `${filename}${defaultFilename.includes('_summary') ? '_summary' : ''}.csv`;
 
             const headers = Object.keys(data[0]);
             const csvRows = [headers.join(',')];
-
             data.forEach(row => {
-                const values = headers.map(header => {
-                    const value = row[header] !== undefined && row[header] !== null ? row[header] : '';
-                    const escaped = ('' + value).replace(/"/g, '""');
-                    return `"${escaped}"`;
-                });
+                const values = headers.map(header => `"${(row[header] ?? '').toString().replace(/"/g, '""')}"`);
                 csvRows.push(values.join(','));
             });
-
-            const csvString = csvRows.join('\n');
-            triggerDownload(csvString, 'text/csv', filename);
+            triggerDownload(csvRows.join('\n'), 'text/csv', filename);
         }
 
         function triggerDownload(content, mimeType, filename) {
             const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
-            
             const a = document.createElement('a');
-            a.setAttribute('hidden', '');
-            a.setAttribute('href', url);
-            a.setAttribute('download', filename);
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
+            window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         }
 
-        downloadSummaryBtn.addEventListener('click', () => {
-            downloadCSV(summarizedData, 'cricsheet_summary.csv');
-        });
-        
-        downloadCsvBtn.addEventListener('click', () => {
-            downloadCSV(processedData, 'cricsheet_detailed.csv');
-        });
-
+        downloadSummaryBtn.addEventListener('click', () => downloadCSV(summarizedData, 'cricsheet_summary.csv'));
+        downloadCsvBtn.addEventListener('click', () => downloadCSV(getFilteredData(), 'cricsheet_detailed.csv'));
         downloadJsonBtn.addEventListener('click', () => {
-            if (processedData.length === 0) {
-                alert('No data to download.');
-                return;
-            }
-
-            let filename = outputFilenameInput.value.trim();
-            if (!filename) {
-                filename = 'cricsheet_data.json';
-            }
-            if (!filename.toLowerCase().endsWith('.json')) {
-                filename += '.json';
-            }
-
-            const jsonString = JSON.stringify(processedData, null, 2); // Pretty print JSON
-            triggerDownload(jsonString, 'application/json', filename);
+            const dataToDownload = getFilteredData();
+            if (dataToDownload.length === 0) { alert('No data for the current selection.'); return; }
+            let filename = outputFilenameInput.value.trim() || 'cricsheet_data';
+            filename = `${filename}.json`;
+            triggerDownload(JSON.stringify(dataToDownload, null, 2), 'application/json', filename);
         });
     </script>
 </body>
