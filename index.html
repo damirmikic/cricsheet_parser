@@ -51,13 +51,11 @@
 <body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
 
     <div class="container w-full mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-10 space-y-8">
-        <!-- Header -->
         <div class="text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-white">Cricsheet Data Extractor</h1>
             <p class="text-gray-400 mt-2">Upload, analyze, and export detailed cricket match data.</p>
         </div>
 
-        <!-- File Upload Section -->
         <div id="file-drop-area" class="relative border-4 border-dashed border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-700/50">
             <input type="file" id="file-input" multiple accept=".json" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
             <div class="flex flex-col items-center justify-center space-y-4">
@@ -67,7 +65,6 @@
             </div>
         </div>
         
-        <!-- File List & Actions -->
         <div id="actions-section" class="space-y-6">
             <div id="file-list-container" class="hidden">
                  <div id="file-list" class="space-y-2 text-sm"></div>
@@ -85,19 +82,16 @@
              </div>
         </div>
         
-        <!-- Status & Preview Section -->
         <div id="status-container" class="hidden pt-6 border-t border-gray-700 space-y-4">
             <p id="status-message" class="text-center text-gray-400"></p>
             
             <div id="results-wrapper" class="hidden space-y-4">
-                <!-- Preview Tabs -->
                 <div class="flex border-b border-gray-700">
                     <button data-tab="detailed" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition active">Detailed</button>
                     <button data-tab="summary" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition">Match Summary</button>
                     <button data-tab="stats" class="tab-button py-2 px-4 text-gray-400 hover:bg-gray-700/50 rounded-t-lg transition">Player Stats</button>
                 </div>
                 
-                <!-- Advanced Filters -->
                 <div id="filters-container" class="flex flex-col sm:flex-row gap-4">
                     <select id="inning-filter" class="bg-gray-700 text-white w-full sm:w-1/2 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
                         <option value="all">All Innings</option>
@@ -107,14 +101,11 @@
                     </select>
                 </div>
                 
-                <!-- Preview Table -->
                 <div id="preview-container" class="bg-gray-900 rounded-lg shadow-inner">
                     <div id="preview-table-container" class="w-full text-left text-sm text-gray-300 rounded-lg">
-                        <!-- Preview table will be generated here -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- Download Actions -->
                 <div id="download-wrapper" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4 border-t border-gray-700">
                     <input type="text" id="output-filename" placeholder="cricsheet_data" class="bg-gray-700 text-white w-full sm:w-auto flex-grow rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600">
                     <div class="flex flex-wrap gap-4">
@@ -136,7 +127,6 @@
         </div>
     </div>
     
-    <!-- Floating Action Button -->
     <button id="scroll-to-actions-btn" class="hidden fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-full shadow-lg transition-transform transform hover:scale-110">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
     </button>
@@ -306,7 +296,12 @@
             })).sort((a, b) => b.runs_scored - a.runs_scored);
         }
 
-        // --- Data Processing (unchanged logic for match summary and detailed) ---
+        // --- Data Processing ---
+        
+        /**
+         * MODIFIED FUNCTION
+         * Processes raw Cricsheet JSON data to extract enhanced match summary statistics.
+         */
         function processMatchSummary(data, fileName) {
             const matchId = fileName.split('.')[0];
             const info = data.info || {};
@@ -331,23 +326,207 @@
                 player_of_match: playerOfMatch
             };
 
+            // --- New Stats Initialization ---
+            let match_fours = 0;
+            let match_sixes = 0;
+            let match_ducks = 0;
+            let match_wides = 0;
+            let match_wickets = 0;
+            let match_run_outs = 0;
+            let match_extras = 0;
+            let match_first_over_runs = 0;
+            
+            const player_fours = {};
+            const player_sixes = {};
+            const player_balls = {}; // To find total batsmen
+            
+            let inning_opening_partnerships = []; // [ runs_inn_1, runs_inn_2 ]
+
             (data.innings || []).forEach((inningData, i) => {
                 const inningNum = i + 1;
                 let totalRuns = 0;
-                let totalWickets = 0;
-                (inningData.overs || []).forEach(overData => {
+                let totalWickets = 0; // Original logic
+                
+                // --- Innings Stats Init ---
+                let inning_fours = 0;
+                let inning_sixes = 0;
+                let inning_wickets_detailed = 0; // New detailed count
+                let inning_run_outs = 0;
+                let inning_extras = 0;
+                let inning_first_dismissal_method = 'N/A';
+                let inning_runs_at_first_wicket = 'N/A';
+                
+                let first_wicket_fallen = false;
+                let opening_partnership_runs = 0;
+                let openers_identified = false;
+                let opener_set = [];
+                let opening_partnership_broken = false;
+                
+                const inning_player_runs = {};
+                const inning_players_out = new Set();
+                
+                (inningData.overs || []).forEach((overData, overIndex) => {
                     (overData.deliveries || []).forEach(delivery => {
-                        totalRuns += delivery.runs.total;
+                        const batter = delivery.batter;
+                        const non_striker = delivery.non_striker;
+                        const runs = delivery.runs || {};
+                        const batter_runs = runs.batter || 0;
+                        const extra_runs = runs.extras || 0;
+                        const total_delivery_runs = runs.total || 0;
+                        
+                        // --- Identify Openers ---
+                        if (!openers_identified) {
+                            opener_set = [batter, non_striker];
+                            openers_identified = true;
+                        }
+
+                        // --- Track Batters for Ducks (Inning-level) ---
+                        if (!inning_player_runs[batter]) inning_player_runs[batter] = 0;
+                        inning_player_runs[batter] += batter_runs;
+
+                        // --- Track Batters for Fours/Sixes/Balls (Match-level) ---
+                        if (!player_fours[batter]) player_fours[batter] = 0;
+                        if (!player_sixes[batter]) player_sixes[batter] = 0;
+                        if (!player_balls[batter]) player_balls[batter] = 0;
+                        if (!(delivery.extras && (delivery.extras.wides || delivery.extras.noballs))) { // Ball faced
+                             player_balls[batter] += 1;
+                        }
+
+                        // --- Update Totals ---
+                        totalRuns += total_delivery_runs;
+                        match_extras += extra_runs;
+                        inning_extras += extra_runs;
+                        
+                        // --- Update Opening Partnership Runs ---
+                        if (!opening_partnership_broken) {
+                            opening_partnership_runs = totalRuns;
+                        }
+
+                        // First Over Runs (Match) - Only from first inning
+                        if (inningNum === 1 && overIndex === 0) {
+                            match_first_over_runs += total_delivery_runs;
+                        }
+
+                        // Fours
+                        if (batter_runs === 4) {
+                            match_fours++;
+                            inning_fours++;
+                            player_fours[batter]++;
+                        }
+                        
+                        // Sixes
+                        if (batter_runs === 6) {
+                            match_sixes++;
+                            inning_sixes++;
+                            player_sixes[batter]++;
+                        }
+                        
+                        // Wides
+                        if (delivery.extras && delivery.extras.wides) {
+                            match_wides += delivery.extras.wides; // Assumes 'wides' value is the number of runs
+                        }
+
+                        // Wickets
                         if (delivery.wickets && delivery.wickets.length > 0) {
-                            totalWickets++;
+                            totalWickets++; // Original logic
+                            match_wickets++;
+                            inning_wickets_detailed++;
+                            
+                            const wicket = delivery.wickets[0];
+                            const player_out = wicket.player_out;
+                            inning_players_out.add(player_out);
+
+                            // Run Outs
+                            if (wicket.kind === 'run out') {
+                                match_run_outs++;
+                                inning_run_outs++;
+                            }
+                            
+                            // First Dismissal
+                            if (!first_wicket_fallen) {
+                                first_wicket_fallen = true;
+                                inning_first_dismissal_method = wicket.kind;
+                                inning_runs_at_first_wicket = totalRuns - total_delivery_runs; // Score *before* this ball
+                            }
+                            
+                            // Check if an opener got out
+                            if (!opening_partnership_broken && opener_set.includes(player_out)) {
+                                opening_partnership_broken = true;
+                                opening_partnership_runs = totalRuns - total_delivery_runs; // Final partnership score
+                            }
                         }
                     });
                 });
+                
+                inning_opening_partnerships.push(opening_partnership_runs);
+
                 summary[`inning_${inningNum}_team`] = inningData.team;
                 summary[`inning_${inningNum}_runs`] = totalRuns;
-                summary[`inning_${inningNum}_wickets`] = totalWickets;
-            });
+                summary[`inning_${inningNum}_wickets`] = totalWickets; // Original field (total wickets fallen)
+                
+                // --- Add new inning stats to summary ---
+                summary[`inning_${inningNum}_fours`] = inning_fours;
+                summary[`inning_${inningNum}_sixes`] = inning_sixes;
+                summary[`inning_${inningNum}_boundaries`] = inning_fours + inning_sixes;
+                summary[`inning_${inningNum}_extras`] = inning_extras;
+                summary[`inning_${inningNum}_wickets_detailed`] = inning_wickets_detailed;
+                summary[`inning_${inningNum}_run_outs`] = inning_run_outs;
+                summary[`inning_${inningNum}_first_dismissal_method`] = inning_first_dismissal_method;
+                summary[`inning_${inningNum}_first_wicket_runs`] = inning_runs_at_first_wicket;
 
+                // --- Calculate Innings Ducks ---
+                let inning_batters_out_for_duck = 0;
+                inning_players_out.forEach(player => {
+                    // A duck is 0 runs AND dismissed.
+                    if (inning_player_runs[player] === 0 || inning_player_runs[player] === undefined) {
+                        inning_batters_out_for_duck++;
+                    }
+                });
+                summary[`inning_${inningNum}_ducks`] = inning_batters_out_for_duck;
+                match_ducks += inning_batters_out_for_duck;
+            });
+            
+            // --- Final Match-level Calculations ---
+            
+            // Most Fours
+            let max_fours = 0;
+            let player_most_fours = 'N/A';
+            for (const player in player_fours) {
+                if (player_fours[player] > max_fours) {
+                    max_fours = player_fours[player];
+                    player_most_fours = player;
+                }
+            }
+            
+            // Most Sixes
+            let max_sixes = 0;
+            let player_most_sixes = 'N/A';
+            for (const player in player_sixes) {
+                if (player_sixes[player] > max_sixes) {
+                    max_sixes = player_sixes[player];
+                    player_most_sixes = player;
+                }
+            }
+            
+            // Highest Opening Partnership
+            summary.highest_opening_partnership = Math.max(...inning_opening_partnerships, 0);
+
+            // Total Batsmen (players who faced at least one ball)
+            summary.total_batsmen = Object.keys(player_balls).length;
+            
+            // Add new match stats to summary
+            summary.match_fours = match_fours;
+            summary.match_sixes = match_sixes;
+            summary.match_boundaries = match_fours + match_sixes;
+            summary.match_ducks = match_ducks;
+            summary.match_wides = match_wides;
+            summary.match_wickets_total = match_wickets;
+            summary.match_run_outs = match_run_outs;
+            summary.match_extras = match_extras;
+            summary.first_over_runs = match_first_over_runs;
+            summary.most_fours_player = max_fours > 0 ? `${player_most_fours} (${max_fours})` : 'N/A';
+            summary.most_sixes_player = max_sixes > 0 ? `${player_most_sixes} (${max_sixes})` : 'N/A';
+            
             return summary;
         }
 
@@ -563,4 +742,3 @@
     </script>
 </body>
 </html>
-
