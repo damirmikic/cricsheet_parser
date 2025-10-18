@@ -340,10 +340,16 @@
             const player_sixes = {};
             const player_balls = {}; // To find total batsmen
             
-            let inning_opening_partnerships = []; // [ runs_inn_1, runs_inn_2 ]
+            // --- Team Stats Init ---
+            let team1_fours = 0, team2_fours = 0;
+            let team1_sixes = 0, team2_sixes = 0;
+            let inning_opening_partnerships = []; // Will store { team, runs }
+            let match_highest_individual_score = 0;
+            let match_highest_individual_scorer = 'N/A';
 
             (data.innings || []).forEach((inningData, i) => {
                 const inningNum = i + 1;
+                const current_team_name = inningData.team;
                 let totalRuns = 0;
                 let totalWickets = 0; // Original logic
                 
@@ -412,6 +418,8 @@
                             match_fours++;
                             inning_fours++;
                             player_fours[batter]++;
+                            if (current_team_name === summary.team1) team1_fours++;
+                            else if (current_team_name === summary.team2) team2_fours++;
                         }
                         
                         // Sixes
@@ -419,6 +427,8 @@
                             match_sixes++;
                             inning_sixes++;
                             player_sixes[batter]++;
+                            if (current_team_name === summary.team1) team1_sixes++;
+                            else if (current_team_name === summary.team2) team2_sixes++;
                         }
                         
                         // Wides
@@ -458,7 +468,16 @@
                     });
                 });
                 
-                inning_opening_partnerships.push(opening_partnership_runs);
+                // --- Store inning-level results ---
+                inning_opening_partnerships.push({ team: current_team_name, runs: opening_partnership_runs });
+                
+                // Check for highest individual score this inning
+                for (const player in inning_player_runs) {
+                    if (inning_player_runs[player] > match_highest_individual_score) {
+                        match_highest_individual_score = inning_player_runs[player];
+                        match_highest_individual_scorer = player;
+                    }
+                }
 
                 summary[`inning_${inningNum}_team`] = inningData.team;
                 summary[`inning_${inningNum}_runs`] = totalRuns;
@@ -488,7 +507,7 @@
             
             // --- Final Match-level Calculations ---
             
-            // Most Fours
+            // Most Fours (Player)
             let max_fours = 0;
             let player_most_fours = 'N/A';
             for (const player in player_fours) {
@@ -498,7 +517,7 @@
                 }
             }
             
-            // Most Sixes
+            // Most Sixes (Player)
             let max_sixes = 0;
             let player_most_sixes = 'N/A';
             for (const player in player_sixes) {
@@ -508,8 +527,19 @@
                 }
             }
             
-            // Highest Opening Partnership
-            summary.highest_opening_partnership = Math.max(...inning_opening_partnerships, 0);
+            // --- NEW: Highest Opening Partnership (Team & Runs) ---
+            const hop1 = inning_opening_partnerships[0] || { runs: 0, team: 'N/A' };
+            const hop2 = inning_opening_partnerships[1] || { runs: 0, team: 'N/A' };
+            if (hop1.runs > hop2.runs) {
+                summary.highest_opening_partnership = hop1.runs;
+                summary.team_highest_opening_partnership = hop1.team;
+            } else if (hop2.runs > hop1.runs) {
+                summary.highest_opening_partnership = hop2.runs;
+                summary.team_highest_opening_partnership = hop2.team;
+            } else {
+                summary.highest_opening_partnership = hop1.runs;
+                summary.team_highest_opening_partnership = hop1.runs > 0 ? 'Tied' : 'N/A';
+            }
 
             // Total Batsmen (players who faced at least one ball)
             summary.total_batsmen = Object.keys(player_balls).length;
@@ -527,6 +557,11 @@
             summary.most_fours_player = max_fours > 0 ? `${player_most_fours} (${max_fours})` : 'N/A';
             summary.most_sixes_player = max_sixes > 0 ? `${player_most_sixes} (${max_sixes})` : 'N/A';
             
+            // --- NEW: Team Fours/Sixes & Highest Score ---
+            summary.team_most_fours = team1_fours > team2_fours ? summary.team1 : (team2_fours > team1_fours ? summary.team2 : 'Tied');
+            summary.team_most_sixes = team1_sixes > team2_sixes ? summary.team1 : (team2_sixes > team1_sixes ? summary.team2 : 'Tied');
+            summary.highest_individual_score = `${match_highest_individual_scorer} (${match_highest_individual_score})`;
+
             return summary;
         }
 
