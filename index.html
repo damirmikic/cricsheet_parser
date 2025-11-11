@@ -270,30 +270,55 @@
 
         function processPlayerStats(detailedData) {
             const stats = {};
-            
-            detailedData.forEach(d => {
-                // Batter stats
-                if (!stats[d.batter]) stats[d.batter] = { runs: 0, balls: 0, wickets: 0, overs: 0, runs_conceded: 0 };
-                stats[d.batter].runs += d.runs_scored;
-                stats[d.batter].balls += 1;
 
-                // Bowler stats
-                if (!stats[d.bowler]) stats[d.bowler] = { runs: 0, balls: 0, wickets: 0, overs: 0, runs_conceded: 0 };
-                if (d.wicket_kind && d.wicket_kind !== 'run out') {
-                     stats[d.bowler].wickets += 1;
+            const ensurePlayerEntry = player => {
+                if (!player) return null;
+                if (!stats[player]) {
+                    stats[player] = { runs: 0, balls: 0, wickets: 0, legal_balls_bowled: 0, runs_conceded: 0 };
                 }
-                stats[d.bowler].runs_conceded += (d.runs_scored + d.extras); // Simplified concession
-                stats[d.bowler].overs += 1/6;
+                return stats[player];
+            };
+
+            detailedData.forEach(d => {
+                const runsScored = d.runs_scored || 0;
+                const extrasConceded = d.extras || 0;
+                const isLegalDelivery = d.is_legal_delivery !== false;
+
+                const batterStats = ensurePlayerEntry(d.batter);
+                if (batterStats) {
+                    batterStats.runs += runsScored;
+                    if (isLegalDelivery) {
+                        batterStats.balls += 1;
+                    }
+                }
+
+                const bowlerStats = ensurePlayerEntry(d.bowler);
+                if (!bowlerStats) return;
+
+                if (isLegalDelivery) {
+                    bowlerStats.legal_balls_bowled += 1;
+                }
+                if (d.wicket_kind && d.wicket_kind !== 'run out') {
+                    bowlerStats.wickets += 1;
+                }
+                bowlerStats.runs_conceded += runsScored + extrasConceded; // Simplified concession
             });
-            
-            return Object.entries(stats).map(([player, data]) => ({
-                player,
-                runs_scored: data.runs,
-                balls_faced: data.balls,
-                wickets_taken: data.wickets,
-                runs_conceded: data.runs_conceded,
-                overs_bowled: parseFloat(data.overs.toFixed(1))
-            })).sort((a, b) => b.runs_scored - a.runs_scored);
+
+            return Object.entries(stats).map(([player, data]) => {
+                const overs = data.legal_balls_bowled || 0;
+                const completedOvers = Math.floor(overs / 6);
+                const balls = overs % 6;
+                const oversFormatted = `${completedOvers}.${balls}`;
+
+                return {
+                    player,
+                    runs_scored: data.runs,
+                    balls_faced: data.balls,
+                    wickets_taken: data.wickets,
+                    runs_conceded: data.runs_conceded,
+                    overs_bowled: oversFormatted
+                };
+            }).sort((a, b) => b.runs_scored - a.runs_scored);
         }
 
         // --- Data Processing ---
@@ -606,10 +631,12 @@
                 
                 inningData.overs.forEach((overData, overNum) => {
                     overData.deliveries.forEach((delivery, ballNum) => {
-                        if (!(delivery.extras && (delivery.extras.wides || delivery.extras.noballs))) {
+                        const extrasDetail = delivery.extras || {};
+                        const isLegalDelivery = !(extrasDetail.wides || extrasDetail.noballs);
+                        if (isLegalDelivery) {
                             totalBallsInInning++;
                         }
-                        
+
                         currentScore += delivery.runs.total;
                         const isWicket = delivery.wickets && delivery.wickets.length > 0;
                         if (isWicket) wicketsDown++;
@@ -639,6 +666,7 @@
                             non_striker: delivery.non_striker,
                             runs_scored: delivery.runs.batter,
                             extras: delivery.runs.extras,
+                            is_legal_delivery: isLegalDelivery,
                             current_score: currentScore,
                             wickets_down: wicketsDown,
                             balls_remaining: ballsRemaining,
