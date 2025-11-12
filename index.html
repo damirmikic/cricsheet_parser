@@ -596,8 +596,35 @@
             const playerOfMatchData = info.player_of_match || [];
             const playerOfMatch = playerOfMatchData.length > 0 ? playerOfMatchData[0] : '';
             const outcome = info.outcome || {};
-            const byRuns = outcome.by && outcome.by.runs;
-            
+            const outcomeBy = outcome.by || {};
+            const hasRunsMargin = typeof outcomeBy.runs === 'number';
+            const hasWicketsMargin = typeof outcomeBy.wickets === 'number';
+            const hasInningsMargin = typeof outcomeBy.innings === 'number';
+            const hasBallsMargin = typeof outcomeBy.balls === 'number';
+
+            let resultType = outcome.result || '';
+            let resultMargin = '';
+
+            if (!resultType) {
+                if (hasRunsMargin) {
+                    resultType = 'runs';
+                    resultMargin = outcomeBy.runs;
+                } else if (hasWicketsMargin) {
+                    resultType = 'wickets';
+                    resultMargin = outcomeBy.wickets;
+                } else if (hasInningsMargin) {
+                    resultType = 'innings';
+                    resultMargin = outcomeBy.innings;
+                } else if (hasBallsMargin) {
+                    resultType = 'balls';
+                    resultMargin = outcomeBy.balls;
+                }
+            }
+
+            if (!resultType) {
+                resultType = 'N/A';
+            }
+
             const matchData = {
                 match_id: matchId,
                 season: info.season || '',
@@ -609,8 +636,8 @@
                 toss_winner: (info.toss && info.toss.winner) || '',
                 toss_decision: (info.toss && info.toss.decision) || '',
                 winner: outcome.winner || 'N/A',
-                result: byRuns !== undefined ? 'runs' : 'wickets',
-                result_margin: byRuns !== undefined ? byRuns : (outcome.by && outcome.by.wickets),
+                result: resultType,
+                result_margin: resultMargin,
                 player_of_match: playerOfMatch
             };
 
