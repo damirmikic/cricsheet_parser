@@ -390,7 +390,7 @@
                 let first_wicket_fallen = false;
                 let opening_partnership_runs = 0;
                 let openers_identified = false;
-                let opener_set = [];
+                let opener_set = new Set();
                 let opening_partnership_broken = false;
                 
                 const inning_player_runs = {};
@@ -407,7 +407,7 @@
                         
                         // --- Identify Openers ---
                         if (!openers_identified) {
-                            opener_set = [batter, non_striker];
+                            opener_set = new Set([batter, non_striker]);
                             openers_identified = true;
                         }
 
@@ -430,7 +430,8 @@
                         
                         // --- Update Opening Partnership Runs ---
                         if (!opening_partnership_broken) {
-                            opening_partnership_runs = totalRuns;
+                            // Accumulate all runs (including wicket-ball extras) until an opener is dismissed
+                            opening_partnership_runs += total_delivery_runs;
                         }
 
                         // First Over Runs (Match) - Only from first inning
@@ -485,9 +486,8 @@
                             }
                             
                             // Check if an opener got out
-                            if (!opening_partnership_broken && opener_set.includes(player_out)) {
+                            if (!opening_partnership_broken && opener_set.has(player_out)) {
                                 opening_partnership_broken = true;
-                                opening_partnership_runs = totalRuns - total_delivery_runs; // Final partnership score
                             }
                         }
                     });
